@@ -954,7 +954,11 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
         for i in range(counts.get('positive', 0)):
             tuid_counter += 1
             idx = random.randint(0, 2)
-            ppt_name = PPT_NAME[(idx+i) % len(PPT_NAME)]
+            if 5 not in PAYMENT_FREQUENCY_U:
+                filtered_PPT_NAME = [ppt for ppt in PPT_NAME if ppt != "Single Pay"]
+            else:
+                filtered_PPT_NAME = PPT_NAME.copy()
+            ppt_name = filtered_PPT_NAME[(idx+i) % len(filtered_PPT_NAME)]
             rule = PPT_RULES.get(ppt_name)
             min_entry_age, max_entry_age = rule['entry_age_range']
             age = random.randint(min_entry_age, max_entry_age)
@@ -1962,13 +1966,21 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
     if 'PaymentFrequency' in selected_epics_rider:
         target_rule = 'PaymentFrequency'
         counts = epic_counts_rider.get(target_rule, {'positive': 0, 'negative': 0})
+        PAYMENT_FREQUENCY_U = epic_counts_rider.get(target_rule, {}).get('payment_frequency_options')
+        if not PAYMENT_FREQUENCY_U:
+            PAYMENT_FREQUENCY_U = PAYMENT_FREQUENCY.copy()
         # Positive Cases
         for i in range(counts.get('positive', 0)):
             tuid_counter += 1
             # age = random.randint(min_entry_age, max_entry_age)
             idx = random.randint(0, 2)
             idy = random.randint(0, 1)
-            ppt_name = PPT_NAME[(idx+i) % len(PPT_NAME)]
+            # ppt_name = PPT_NAME[(idx+i) % len(PPT_NAME)]
+            if 5 not in PAYMENT_FREQUENCY_U:
+                filtered_PPT_NAME = [ppt for ppt in PPT_NAME if ppt != "Single Pay"]
+            else:
+                filtered_PPT_NAME = PPT_NAME.copy()
+            ppt_name = filtered_PPT_NAME[(idx+i) % len(filtered_PPT_NAME)]
             rule = PPT_RULES.get(ppt_name)
             # min_maturity_age, max_maturity_age = rule['maturity_age_range']
             min_entry_age, max_entry_age = rule['entry_age_range']
@@ -1980,7 +1992,7 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
             charge_year_rider, coverage_year_rider, maturity_year_rider = build_rider_years(charge_year, coverage_year, maturity_year)
             ad_sum_assured = min(30000000, random.randint(25000, 3 * calculate_discounts(ppt_name)["sumAssured"]))
             discount_info = calculate_discounts(ppt_name)
-            payment_freq = normalize_payment_frequency(ppt_name, random.choice(PAYMENT_FREQUENCY))
+            payment_freq = normalize_payment_frequency(ppt_name, random.choice(PAYMENT_FREQUENCY_U))
             
             common_row = build_common_row(
                 tuid_counter,
@@ -2279,3 +2291,6 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
         df = df.drop(columns=["FLC date", "Grace date", "Lapse date"], errors='ignore')
     return df
 
+# issue in choosing single pay, if there is not single pay in options, but due to ppt_name, single gets selected.
+
+# fix payment frequency for rider cases, currently it is taking same payment frequency for base and rider, need to change it to take separate payment frequency for rider cases.

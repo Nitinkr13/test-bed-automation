@@ -928,7 +928,12 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
         for i in range(counts.get('positive', 0)):
             tuid_counter += 1
             idx = random.randint(0, 2)
-            ppt_name = PPT_NAME[(idx+i) % len(PPT_NAME)]
+            # ppt_name = PPT_NAME[(idx+i) % len(PPT_NAME)]
+            if 5 not in PAYMENT_FREQUENCY_U:
+                filtered_PPT_NAME = [ppt for ppt in PPT_NAME if ppt != "Single Pay"]
+            else:
+                filtered_PPT_NAME = PPT_NAME.copy()
+            ppt_name = filtered_PPT_NAME[(idx+i) % len(filtered_PPT_NAME)]
             rule = PPT_RULES.get(ppt_name)
             min_entry_age, max_entry_age = rule['entry_age_range']
             age = random.randint(min_entry_age, max_entry_age)
