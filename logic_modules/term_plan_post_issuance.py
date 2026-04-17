@@ -16,7 +16,7 @@ RCD_MAX_MONTHS_BACK = 36
 POST_REVIVAL_LAPSE_MONTHS_BACK = 61
 NULL_VOID_DATE_MAX_DAYS_BEFORE_PTD = 10
 
-HEADER_ORDER = ["FLC", "Grace", "Lapse", "Reinstatement", "Null and Void"]
+HEADER_ORDER = ["FLC", "Grace", "Lapse", "Reinstatement", "Null and Void", "Renewal"]
 
 POST_ISSUANCE_EPICS_BY_PLAN = {
     "term plan": {
@@ -58,7 +58,13 @@ POST_ISSUANCE_EPICS_BY_PLAN = {
         "Null and Void": [
             "Null & Void Full refund",
             "Null & Void No refund",   
-        ]
+        ],
+        "Renewal": [
+            "Renewal premium calculation and acceptence - Annual",
+            "Renewal premium calculation and acceptence - Half Yearly",
+            "Renewal premium calculation and acceptence - Quarterly",
+            "Renewal premium calculation and acceptence - Monthly",
+        ],
     }
 }
 
@@ -96,6 +102,11 @@ EPIC_TEST_SCENARIO_MAP = {
     # Null and Void scenarios
     "Null & Void Full refund": "To verify whether policy is Null & Void full refund.",
     "Null & Void No refund": "To verify whether policy is Null & Void no refund.",
+    # Renewal scenarios
+    "Renewal premium calculation and acceptence - Annual": "To check Policy can be renewed with correct renewal premium for Annual mode.",
+    "Renewal premium calculation and acceptence - Half Yearly": "To check Policy can be renewed with correct renewal premium for Half Yearly mode.",
+    "Renewal premium calculation and acceptence - Quarterly": "To check Policy can be renewed with correct renewal premium for Quarterly mode.",
+    "Renewal premium calculation and acceptence - Monthly": "To check Policy can be renewed with correct renewal premium for Monthly mode.",
 }
 
 EPIC_EXPECTED_RESULT_MAP = {
@@ -131,6 +142,11 @@ EPIC_EXPECTED_RESULT_MAP = {
     # Null and Void scenarios
     "Null & Void Full refund": "When Null & Void full refund  is processed \nThen Policy status change to Terminated Null & Void full refund. \nCorrect amount should be refunded. Commission should be clawed back, Test Commission lines, Test OFI lines \nTest actuarial extract",
     "Null & Void No refund": "When Null & Void no refund is processed \nThen Policy status change to Terminated Null & Void no refund. \nNo amount should be refunded. Commission should be retained, Test Commission lines, Test OFI lines \nTest actuarial extract",
+    # Renewal scenarios
+    "Renewal premium calculation and acceptence - Annual": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Annual mode.",
+    "Renewal premium calculation and acceptence - Half Yearly": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Half Yearly mode.",
+    "Renewal premium calculation and acceptence - Quarterly": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Quarterly mode.",
+    "Renewal premium calculation and acceptence - Monthly": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Monthly mode.",
 }
 
 EPIC_TEST_SCENARIO_MAP_RIDER = {
@@ -167,6 +183,11 @@ EPIC_TEST_SCENARIO_MAP_RIDER = {
     # Null and Void scenarios
     "Null & Void Full refund": "To verify whether policy is Null & Void full refund.",
     "Null & Void No refund": "To verify whether policy is Null & Void no refund.",
+    # Renewal scenarios
+    "Renewal premium calculation and acceptence - Annual": "To check Policy can be renewed with correct renewal premium for Annual mode.",
+    "Renewal premium calculation and acceptence - Half Yearly": "To check Policy can be renewed with correct renewal premium for Half Yearly mode.",
+    "Renewal premium calculation and acceptence - Quarterly": "To check Policy can be renewed with correct renewal premium for Quarterly mode.",
+    "Renewal premium calculation and acceptence - Monthly": "To check Policy can be renewed with correct renewal premium for Monthly mode.",
 }
 
 EPIC_EXPECTED_RESULT_MAP_RIDER = {
@@ -202,6 +223,11 @@ EPIC_EXPECTED_RESULT_MAP_RIDER = {
     # Null and Void scenarios
     "Null & Void Full refund": "When Null & Void full refund  is processed \nThen Policy status change to Terminated Null & Void full refund. \nCorrect amount should be refunded. Commission should be clawed back, Test Commission lines, Test OFI lines \nTest actuarial extract",
     "Null & Void No refund": "When Null & Void no refund is processed \nThen Policy status change to Terminated Null & Void no refund. \nNo amount should be refunded. Commission should be retained, Test Commission lines, Test OFI lines \nTest actuarial extract",
+    # Renewal scenarios
+    "Renewal premium calculation and acceptence - Annual": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Annual mode.",
+    "Renewal premium calculation and acceptence - Half Yearly": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Half Yearly mode.",
+    "Renewal premium calculation and acceptence - Quarterly": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Quarterly mode.",
+    "Renewal premium calculation and acceptence - Monthly": "The policy should be renewed with correct renewal premium. Renewal premium should be calculated based on the business rules defined for Monthly mode.",
 }
 
 FREQUENCY_INTERVAL_MONTHS = {
@@ -325,6 +351,125 @@ def _resolve_payment_frequency_options(counts):
     return [1, 2, 3, 4, 5]
 
 
+def _normalize_frequency_options(options):
+    """Normalize payment frequency options to unique integer values."""
+    normalized = []
+    for option in options or []:
+        try:
+            option_value = int(option)
+        except (TypeError, ValueError):
+            continue
+        if option_value in {1, 2, 3, 4, 5} and option_value not in normalized:
+            normalized.append(option_value)
+    return normalized
+
+
+def _to_int(value, default=None):
+    """Safely convert values to int, preserving default on conversion failure."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_range(range_value):
+    """Normalize a range tuple/list into ordered integer bounds."""
+    if not isinstance(range_value, (list, tuple)) or len(range_value) != 2:
+        return None
+
+    min_value = _to_int(range_value[0])
+    max_value = _to_int(range_value[1])
+    if min_value is None or max_value is None:
+        return None
+
+    if min_value > max_value:
+        min_value, max_value = max_value, min_value
+
+    return min_value, max_value
+
+
+def _resolve_ppt_range(range_map, ppt_name):
+    """Resolve configured range for a premium payment option."""
+    if not isinstance(range_map, dict):
+        return None
+    return _normalize_range(range_map.get(ppt_name))
+
+
+def _apply_seed_value_constraints(seed_df, counts):
+    """Apply configured entry/term/sum-assured constraints on seed rows."""
+    if seed_df is None or seed_df.empty:
+        return seed_df
+
+    counts = counts or {}
+    entry_age_ranges = counts.get("entry_age_ranges") or {}
+    policy_term_ranges = counts.get("policy_term_ranges") or {}
+    maturity_age_ranges = counts.get("maturity_age_ranges") or {}
+    premium_paying_term_ranges = counts.get("premium_paying_term_ranges") or {}
+    sum_assured_ranges = counts.get("sum_assured_ranges") or {}
+
+    def _apply_row_constraints(row):
+        ppt_name = str(row.get("Premium Payment Option", "")).strip()
+
+        age = _to_int(row.get("Age"), 30)
+        coverage_year = _to_int(row.get("coverageYear"), 10)
+        charge_year = _to_int(row.get("chargeYear"), 1)
+
+        entry_age_range = _resolve_ppt_range(entry_age_ranges, ppt_name)
+        if entry_age_range:
+            age = random.randint(entry_age_range[0], entry_age_range[1])
+
+        policy_term_range = _resolve_ppt_range(policy_term_ranges, ppt_name)
+        if policy_term_range:
+            coverage_year = random.randint(policy_term_range[0], policy_term_range[1])
+
+        premium_paying_range = _resolve_ppt_range(premium_paying_term_ranges, ppt_name)
+        if premium_paying_range:
+            charge_year = random.randint(premium_paying_range[0], premium_paying_range[1])
+
+        maturity_age_range = _resolve_ppt_range(maturity_age_ranges, ppt_name)
+        if maturity_age_range:
+            min_maturity_age, max_maturity_age = maturity_age_range
+            min_coverage_year = max(1, min_maturity_age - age)
+            max_coverage_year = max(min_coverage_year, max_maturity_age - age)
+
+            if policy_term_range:
+                min_coverage_year = max(min_coverage_year, policy_term_range[0])
+                max_coverage_year = min(max_coverage_year, policy_term_range[1])
+
+            if max_coverage_year < min_coverage_year:
+                max_coverage_year = min_coverage_year
+
+            coverage_year = random.randint(min_coverage_year, max_coverage_year)
+
+        if ppt_name == "Single Pay":
+            charge_year = 1
+            row["paymentFreq"] = 5
+            row["paymentFreqW"] = "Single"
+            row["paymentFreqC"] = "Single"
+        elif coverage_year > 0:
+            charge_year = min(charge_year, coverage_year)
+
+        row["Age"] = age
+        row["coverageYear"] = coverage_year
+        row["chargeYear"] = charge_year
+        row["Coverage upto Age"] = age + coverage_year
+
+        sum_assured_key = "Single Pay" if ppt_name.lower() == "single pay" else "Others"
+        sum_assured_config = sum_assured_ranges.get(sum_assured_key, {})
+        min_sum_assured = _to_int(sum_assured_config.get("min_val"))
+        max_sum_assured = _to_int(sum_assured_config.get("max_val"))
+        if (
+            min_sum_assured is not None
+            and max_sum_assured is not None
+            and min_sum_assured <= max_sum_assured
+        ):
+            row["sumAssured"] = random.randint(min_sum_assured, max_sum_assured)
+
+        return row
+
+    return seed_df.apply(_apply_row_constraints, axis=1)
+
+
 def _frequency_options_from_epic_name(epic_name):
     """Extract payment frequency options from epic name text."""
     normalized = (epic_name or "").lower()
@@ -341,14 +486,28 @@ def _frequency_options_from_epic_name(epic_name):
 
 def _resolve_frequency_options_for_epic(header_name, epic_name, counts):
     """Resolve frequency options for a post-issuance epic."""
+    counts = counts or {}
+
     if header_name == "FLC":
-        return [1, 2, 3, 4, 5]
-    if header_name in {"Grace", "Lapse", "Reinstatement", "Null and Void"}:
+        epic_frequency_options = [1, 2, 3, 4, 5]
+    elif header_name in {"Grace", "Lapse", "Reinstatement", "Null and Void", "Renewal"}:
         matched = _frequency_options_from_epic_name(epic_name)
         if matched:
-            return matched
-        return [1, 2, 3, 4]
-    return _resolve_payment_frequency_options(counts)
+            epic_frequency_options = matched
+        else:
+            epic_frequency_options = [1, 2, 3, 4]
+    else:
+        epic_frequency_options = _resolve_payment_frequency_options(counts)
+
+    if "payment_frequency_options" not in counts:
+        return epic_frequency_options
+
+    configured_options = _normalize_frequency_options(counts.get("payment_frequency_options"))
+    configured_option_set = set(configured_options)
+    return [
+        option for option in epic_frequency_options
+        if option in configured_option_set
+    ]
 
 
 def _resolve_frequency_label_for_scenario(epic_name, row):
@@ -408,7 +567,8 @@ def _filter_positive_cases(df, case_count=None, inception_date=None, exclude_sin
 
 
 def generate_positive_payment_frequency_cases_base(frequency_options=None, inception_date=None,
-                                                   case_count=None, exclude_single_pay=False):
+                                                   case_count=None, exclude_single_pay=False,
+                                                   constraint_config=None):
     """Generate positive-only base PaymentFrequency cases."""
     frequency_options = list(frequency_options or [1, 2, 3, 4, 5])
     positive_count = case_count if case_count is not None else max(len(frequency_options), 1)
@@ -425,16 +585,18 @@ def generate_positive_payment_frequency_cases_base(frequency_options=None, incep
         epic_counts_rider={},
         selected_epics_rider=[],
     )
-    return _filter_positive_cases(
+    positive_df = _filter_positive_cases(
         seed_df,
         case_count=positive_count,
         inception_date=inception_date,
         exclude_single_pay=exclude_single_pay,
     )
+    return _apply_seed_value_constraints(positive_df, constraint_config)
 
 
 def generate_positive_payment_frequency_cases_rider(frequency_options=None, inception_date=None,
-                                                    case_count=None, exclude_single_pay=False):
+                                                    case_count=None, exclude_single_pay=False,
+                                                    constraint_config=None):
     """Generate positive-only rider PaymentFrequency cases."""
     frequency_options = list(frequency_options or [1, 2, 3, 4, 5])
     positive_count = case_count if case_count is not None else max(len(frequency_options), 1)
@@ -451,12 +613,13 @@ def generate_positive_payment_frequency_cases_rider(frequency_options=None, ince
         epic_counts_rider=seed_epic_counts_rider,
         selected_epics_rider=["PaymentFrequency"],
     )
-    return _filter_positive_cases(
+    positive_df = _filter_positive_cases(
         seed_df,
         case_count=positive_count,
         inception_date=inception_date,
         exclude_single_pay=exclude_single_pay,
     )
+    return _apply_seed_value_constraints(positive_df, constraint_config)
 
 
 def _get_positive_count(counts):
@@ -760,6 +923,8 @@ def _append_cases_for_header(epic_names, header_name, epic_counts, selected_head
         if positive_count <= 0:
             continue
         frequency_options = _resolve_frequency_options_for_epic(header_name, epic_name, counts)
+        if not frequency_options:
+            continue
         exclude_single_pay = header_name in {"Grace", "Lapse"}
         if isrider:
             seed_rows = generate_positive_payment_frequency_cases_rider(
@@ -767,6 +932,7 @@ def _append_cases_for_header(epic_names, header_name, epic_counts, selected_head
                 inception_date=None,
                 case_count=positive_count,
                 exclude_single_pay=exclude_single_pay,
+                constraint_config=counts,
             )
         else:
             seed_rows = generate_positive_payment_frequency_cases_base(
@@ -774,6 +940,7 @@ def _append_cases_for_header(epic_names, header_name, epic_counts, selected_head
                 inception_date=None,
                 case_count=positive_count,
                 exclude_single_pay=exclude_single_pay,
+                constraint_config=counts,
             )
         
         if seed_rows.empty:
@@ -826,8 +993,8 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
     rider_grouped_epics = _group_epics_by_header(selected_epics_rider, epic_counts_rider, selected_header)
 
     # Process all headers in order: first base cases, then rider cases
+    # Base plan cases
     for header_name in HEADER_ORDER:
-        # Base plan cases
         if header_name=="FLC":
             tuid_counter = _append_cases_for_header(
                 base_grouped_epics[header_name],
@@ -883,8 +1050,19 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
                 isrider=False,
             )
 
+        if header_name=="Renewal":
+            tuid_counter = _append_cases_for_header(
+                base_grouped_epics[header_name],
+                header_name,
+                epic_counts,
+                selected_header,
+                scenarios,
+                tuid_counter,
+                isrider=False,
+            )
+
+    # Rider cases
     for header_name in HEADER_ORDER:
-        # Rider cases
         if header_name=="FLC":
             tuid_counter = _append_cases_for_header(
                 rider_grouped_epics[header_name],
@@ -930,6 +1108,17 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
             )
         
         if header_name=="Null and Void":
+            tuid_counter = _append_cases_for_header(
+                rider_grouped_epics[header_name],
+                header_name,
+                epic_counts_rider,
+                selected_header,
+                scenarios,
+                tuid_counter,
+                isrider=True,
+            )
+
+        if header_name=="Renewal":
             tuid_counter = _append_cases_for_header(
                 rider_grouped_epics[header_name],
                 header_name,
