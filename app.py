@@ -546,6 +546,282 @@ def sync_post_header_selection(shared_key, widget_key):
 
 #     return selected_header, selected_epics, epic_counts
 
+POST_ISSUANCE_PPT_NAMES = [
+    "Single Pay",
+    "Limited Pay (5 pay)",
+    "Limited Pay (10 pay)",
+    "Limited Pay (15 pay)",
+    "Limited Pay (Pay till age 60)",
+    "Regular Pay",
+]
+
+POST_ISSUANCE_ENTRY_AGE_DEFAULTS = {
+    "Single Pay": (18, 65),
+    "Limited Pay (5 pay)": (18, 65),
+    "Limited Pay (10 pay)": (18, 65),
+    "Limited Pay (15 pay)": (18, 65),
+    "Limited Pay (Pay till age 60)": (18, 55),
+    "Regular Pay": (18, 65),
+}
+
+POST_ISSUANCE_POLICY_TERM_DEFAULTS = {
+    "Single Pay": (1, 5),
+    "Limited Pay (5 pay)": (10, 67),
+    "Limited Pay (10 pay)": (15, 67),
+    "Limited Pay (15 pay)": (20, 67),
+    "Limited Pay (Pay till age 60)": (5, 67),
+    "Regular Pay": (5, 67),
+}
+
+POST_ISSUANCE_MATURITY_AGE_DEFAULTS = {
+    "Single Pay": (19, 85),
+    "Limited Pay (5 pay)": (24, 85),
+    "Limited Pay (10 pay)": (29, 85),
+    "Limited Pay (15 pay)": (34, 85),
+    "Limited Pay (Pay till age 60)": (65, 85),
+    "Regular Pay": (23, 85),
+}
+
+POST_ISSUANCE_PREMIUM_PAYING_TERM_DEFAULTS = {
+    "Single Pay": (1, 1),
+    "Limited Pay (5 pay)": (5, 5),
+    "Limited Pay (10 pay)": (10, 10),
+    "Limited Pay (15 pay)": (15, 15),
+    "Limited Pay (Pay till age 60)": (5, 42),
+    "Regular Pay": (5, 67),
+}
+
+POST_ISSUANCE_SUM_ASSURED_DEFAULTS = {
+    "Single Pay": (2500000, 5000000),
+    "Others": (5000000, 20000000),
+}
+
+POST_ISSUANCE_FREQUENCY_OPTIONS = [
+    "Annual",
+    "Half-Yearly",
+    "Quarterly",
+    "Monthly",
+    "Single Pay",
+]
+
+POST_ISSUANCE_FREQUENCY_MAP = {
+    "Annual": 1,
+    "Half-Yearly": 2,
+    "Quarterly": 3,
+    "Monthly": 4,
+    "Single Pay": 5,
+}
+
+
+def _render_post_issuance_range_block(config_prefix, block_name, label,
+                                      default_ranges, slider_min, slider_max):
+    """Render post-issuance PPT range controls and return enabled ranges."""
+    with st.expander(label, expanded=False):
+        ranges = {}
+
+        header = st.columns([0.6, 2.4, 2])
+        with header[1]:
+            st.markdown("**PPT Name**")
+        with header[2]:
+            st.markdown("**Min/Max**")
+
+        for ppt_name in POST_ISSUANCE_PPT_NAMES:
+            enabled_key = lifecycle_key(
+                config_prefix,
+                f"post_cfg_{block_name}_enabled_{ppt_name}"
+            )
+            slider_key = lifecycle_key(
+                config_prefix,
+                f"post_cfg_{block_name}_range_{ppt_name}"
+            )
+
+            if enabled_key not in st.session_state:
+                st.session_state[enabled_key] = True
+
+            default_min, default_max = default_ranges[ppt_name]
+
+            row = st.columns([0.6, 2.4, 2])
+            with row[0]:
+                is_enabled = st.checkbox(
+                    "Enable",
+                    key=enabled_key,
+                    label_visibility="collapsed"
+                )
+            with row[1]:
+                st.markdown(ppt_name)
+            with row[2]:
+                if default_min == default_max:
+                    selected_value = st.slider(
+                        label,
+                        min_value=slider_min,
+                        max_value=slider_max,
+                        value=default_min,
+                        key=slider_key,
+                        label_visibility="collapsed"
+                    )
+                    min_value, max_value = int(selected_value), int(selected_value)
+                else:
+                    min_value, max_value = st.slider(
+                        label,
+                        min_value=slider_min,
+                        max_value=slider_max,
+                        value=(default_min, default_max),
+                        key=slider_key,
+                        label_visibility="collapsed"
+                    )
+
+            if is_enabled:
+                ranges[ppt_name] = (int(min_value), int(max_value))
+
+    return ranges
+
+
+def _render_post_issuance_constraints(config_prefix):
+    """Render shared post-issuance constraint controls across all headers for a tab."""
+    st.markdown("### Configure Seed Values")
+    st.caption("These values are shared across all post-issuance headers in this tab and used during post-issuance generation.")
+
+    freq_cols = st.columns(len(POST_ISSUANCE_FREQUENCY_OPTIONS))
+    selected_frequency_options = []
+
+    for index, frequency_label in enumerate(POST_ISSUANCE_FREQUENCY_OPTIONS):
+        freq_key = lifecycle_key(
+            config_prefix,
+            f"post_cfg_freq_{frequency_label}"
+        )
+        if freq_key not in st.session_state:
+            st.session_state[freq_key] = True
+
+        with freq_cols[index]:
+            if st.checkbox(frequency_label, key=freq_key):
+                selected_frequency_options.append(POST_ISSUANCE_FREQUENCY_MAP[frequency_label])
+
+    entry_age_ranges = _render_post_issuance_range_block(
+        config_prefix,
+        "entry_age",
+        "Entry Age",
+        POST_ISSUANCE_ENTRY_AGE_DEFAULTS,
+        0,
+        85,
+    )
+    policy_term_ranges = _render_post_issuance_range_block(
+        config_prefix,
+        "policy_term",
+        "Policy Term",
+        POST_ISSUANCE_POLICY_TERM_DEFAULTS,
+        1,
+        80,
+    )
+    maturity_age_ranges = _render_post_issuance_range_block(
+        config_prefix,
+        "maturity_age",
+        "Maturity Age",
+        POST_ISSUANCE_MATURITY_AGE_DEFAULTS,
+        19,
+        85,
+    )
+    premium_paying_term_ranges = _render_post_issuance_range_block(
+        config_prefix,
+        "premium_paying_term",
+        "Premium Paying Term",
+        POST_ISSUANCE_PREMIUM_PAYING_TERM_DEFAULTS,
+        1,
+        85,
+    )
+
+    with st.expander("Sum Assured", expanded=False):
+        sum_assured_ranges = {}
+
+        single_enabled_key = lifecycle_key(config_prefix, "post_cfg_sum_assured_single_enabled")
+        others_enabled_key = lifecycle_key(config_prefix, "post_cfg_sum_assured_others_enabled")
+
+        if single_enabled_key not in st.session_state:
+            st.session_state[single_enabled_key] = True
+        if others_enabled_key not in st.session_state:
+            st.session_state[others_enabled_key] = True
+
+        single_row = st.columns([0.6, 2.4, 1.5, 1.5])
+        with single_row[0]:
+            single_enabled = st.checkbox("Enable", key=single_enabled_key, label_visibility="collapsed")
+        with single_row[1]:
+            st.markdown("Single Pay")
+        with single_row[2]:
+            min_single = st.number_input(
+                "Min Single Pay",
+                min_value=0,
+                value=POST_ISSUANCE_SUM_ASSURED_DEFAULTS["Single Pay"][0],
+                key=lifecycle_key(config_prefix, "post_cfg_sum_assured_single_min"),
+                label_visibility="collapsed"
+            )
+        with single_row[3]:
+            max_single = st.number_input(
+                "Max Single Pay",
+                min_value=int(min_single),
+                value=POST_ISSUANCE_SUM_ASSURED_DEFAULTS["Single Pay"][1],
+                key=lifecycle_key(config_prefix, "post_cfg_sum_assured_single_max"),
+                label_visibility="collapsed"
+            )
+
+        others_row = st.columns([0.6, 2.4, 1.5, 1.5])
+        with others_row[0]:
+            others_enabled = st.checkbox("Enable", key=others_enabled_key, label_visibility="collapsed")
+        with others_row[1]:
+            st.markdown("Others")
+        with others_row[2]:
+            min_others = st.number_input(
+                "Min Others",
+                min_value=0,
+                value=POST_ISSUANCE_SUM_ASSURED_DEFAULTS["Others"][0],
+                key=lifecycle_key(config_prefix, "post_cfg_sum_assured_others_min"),
+                label_visibility="collapsed"
+            )
+        with others_row[3]:
+            max_others = st.number_input(
+                "Max Others",
+                min_value=int(min_others),
+                value=POST_ISSUANCE_SUM_ASSURED_DEFAULTS["Others"][1],
+                key=lifecycle_key(config_prefix, "post_cfg_sum_assured_others_max"),
+                label_visibility="collapsed"
+            )
+
+        if single_enabled:
+            sum_assured_ranges["Single Pay"] = {
+                "min_val": int(min_single),
+                "max_val": int(max_single),
+            }
+        if others_enabled:
+            sum_assured_ranges["Others"] = {
+                "min_val": int(min_others),
+                "max_val": int(max_others),
+            }
+
+    return {
+        "payment_frequency_options": selected_frequency_options,
+        "entry_age_ranges": entry_age_ranges,
+        "policy_term_ranges": policy_term_ranges,
+        "maturity_age_ranges": maturity_age_ranges,
+        "premium_paying_term_ranges": premium_paying_term_ranges,
+        "sum_assured_ranges": sum_assured_ranges,
+    }
+
+
+def _build_post_issuance_epic_payload(pos_count, selected_header, constraints):
+    """Build per-epic post-issuance payload with shared constraint configuration."""
+    return {
+        "positive": int(pos_count),
+        "negative": 0,
+        "header": selected_header,
+        "payment_frequency_options": list(constraints.get("payment_frequency_options", [])),
+        "entry_age_ranges": dict(constraints.get("entry_age_ranges", {})),
+        "policy_term_ranges": dict(constraints.get("policy_term_ranges", {})),
+        "maturity_age_ranges": dict(constraints.get("maturity_age_ranges", {})),
+        "premium_paying_term_ranges": dict(constraints.get("premium_paying_term_ranges", {})),
+        "sum_assured_ranges": {
+            key: dict(value)
+            for key, value in constraints.get("sum_assured_ranges", {}).items()
+        },
+    }
+
 def render_post_issuance_epics(plan_type, lifecycle_key_prefix, count_mode, num_positive_global, shared_lifecycle_prefix=None):
     epic_headers = get_post_issuance_epics_for_plan(plan_type)
     selected_epics = []
@@ -605,6 +881,8 @@ def render_post_issuance_epics(plan_type, lifecycle_key_prefix, count_mode, num_
             st.session_state[checkbox_key] = select_all_state
     st.session_state[select_all_prev_key] = select_all_state
 
+    selected_epic_positive_counts = {}
+
     with st.expander(selected_header, expanded=True):
         for epic_index, epic_name in enumerate(header_epics):
             checkbox_key = lifecycle_key(lifecycle_key_prefix, f"post_epic_cb_{selected_header}_{epic_index}")
@@ -629,11 +907,16 @@ def render_post_issuance_epics(plan_type, lifecycle_key_prefix, count_mode, num_
 
             if is_selected:
                 selected_epics.append(epic_name)
-                epic_counts[epic_name] = {
-                    "positive": int(pos_count),
-                    "negative": 0,
-                    "header": selected_header,
-                }
+                selected_epic_positive_counts[epic_name] = int(pos_count)
+
+    post_constraints = _render_post_issuance_constraints(lifecycle_key_prefix)
+
+    for epic_name in selected_epics:
+        epic_counts[epic_name] = _build_post_issuance_epic_payload(
+            selected_epic_positive_counts.get(epic_name, num_positive_global),
+            selected_header,
+            post_constraints,
+        )
 
     return selected_header, selected_epics, epic_counts
 
