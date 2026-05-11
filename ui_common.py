@@ -26,11 +26,11 @@ PLAN_LIFECYCLE_MODULE_MAP = {
         "issuance": "term_plan_issuance",
         "post issuance": "term_plan_post_issuance",
     },
-    "saving plan": {
-        "pre issuance": "saving_plan_pre_issuance",
-        "issuance": "saving_plan_issuance",
-        "post issuance": "saving_plan_post_issuance",
-    },
+    # "saving plan": {
+    #     "pre issuance": "saving_plan_pre_issuance",
+    #     "issuance": "saving_plan_issuance",
+    #     "post issuance": "saving_plan_post_issuance",
+    # },
     "ulip plan": {
         "pre issuance": "ulip_plan_pre_issuance",
         "issuance": "ulip_plan_issuance",
