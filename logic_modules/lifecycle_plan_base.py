@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import inspect
 import os
 from dataclasses import dataclass
 from types import ModuleType
@@ -34,14 +35,31 @@ class LifecyclePlanAdapter:
     def epic_map_rider(self):
         return getattr(self._base_module, "EPIC_MAP_RIDER", {})
 
-    def generate_test_cases(self, epic_counts, selected_epics=None, epic_counts_rider=None, selected_epics_rider=None):
+    def generate_test_cases(
+        self,
+        epic_counts,
+        selected_epics=None,
+        epic_counts_rider=None,
+        selected_epics_rider=None,
+        **kwargs,
+    ):
         generator = getattr(self._base_module, "generate_test_cases")
-        return generator(
-            epic_counts=epic_counts,
-            selected_epics=selected_epics,
-            epic_counts_rider=epic_counts_rider,
-            selected_epics_rider=selected_epics_rider,
-        )
+        call_kwargs = {
+            "epic_counts": epic_counts,
+            "selected_epics": selected_epics,
+            "epic_counts_rider": epic_counts_rider,
+            "selected_epics_rider": selected_epics_rider,
+        }
+        if kwargs:
+            try:
+                sig = inspect.signature(generator)
+            except (TypeError, ValueError):
+                sig = None
+            if sig is not None:
+                for key, value in kwargs.items():
+                    if value is not None and key in sig.parameters:
+                        call_kwargs[key] = value
+        return generator(**call_kwargs)
 
 
 def build_lifecycle_module_exports(base_module_name: str, module_name: str, lifecycle_stage: str, product_code: Optional[str] = None) -> Dict[str, object]:

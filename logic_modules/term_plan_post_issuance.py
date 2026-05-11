@@ -895,7 +895,7 @@ def _apply_post_issuance_overrides(row, epic_name, selected_header, tuid_counter
 # ============================================================================
 
 def _group_epics_by_header(epics, counts_dict, selected_header):
-    """Group epics into their respective header categories (FLC, Grace, Lapse, Reinstatement)."""
+    """Group epics into their respective header categories (FLC, Grace, Lapse, Reinstatement, Null and Void, Renewal)."""
     grouped = {header: [] for header in HEADER_ORDER}
     
     for epic_name in epics:
@@ -1144,8 +1144,8 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
 # Need function to add frequency in test scenario. // done
 # Handle that there is no case of single pay in all except FLC. (need to confirm)
 
-# Do calculation for reinstatement dates and add to test scenario.
-# Add NVFR dates in null & void.
+# Do calculation for reinstatement dates and add to test scenario. //done
+# Add NVFR dates in null & void. //done
 
 # rider frequency does not match name // done
 # base haly yearly is mapping to annual, fix it // done
@@ -1153,3 +1153,7 @@ def generate_test_cases(epic_counts, selected_epics=None, epic_counts_rider=None
 # add positive/negative where required.
 
 # in FLC dates should be one month old only as grace and lapse are not required here.
+
+# fix post issuance value save not working.
+
+# also need to create a function, so that we can update the age, frequency and sum assured too. //done (verify line 410 onwards)
